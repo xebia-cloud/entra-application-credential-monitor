@@ -1,13 +1,14 @@
 using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Graph;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Xebia.Monitoring.Entra.ApplicationSecrets;
 
 var host = Host.CreateDefaultBuilder(args)
-    .ConfigureServices(services =>
+    .ConfigureServices((host, services) =>
     {
         var azureCredential = new DefaultAzureCredential();
         services.AddSingleton(_ => new GraphServiceClient(azureCredential));
@@ -18,19 +19,35 @@ var host = Host.CreateDefaultBuilder(args)
             })
             .WithTracing(builder =>
             {
-                builder
-                    .AddSource("Xebia.Monitoring.Entra.ApplicationSecrets.*")
-                    .AddAzureMonitorTraceExporter();
+                builder.AddSource("Xebia.Monitoring.Entra.ApplicationSecrets.*");
+                if (host.HostingEnvironment.IsDevelopment())
+                {
+                    builder.AddConsoleExporter();
+                }
+                else
+                {
+                    builder.AddAzureMonitorTraceExporter();
+                }
             })
             .WithMetrics(builder =>
             {
-                builder.AddMeter("Xebia.Monitoring.Entra.ApplicationSecrets.*")
-                    .AddAzureMonitorMetricExporter();
+                builder.AddMeter("Xebia.Monitoring.Entra.ApplicationSecrets.*");
+                if (host.HostingEnvironment.IsDevelopment())
+                {
+                    builder.AddConsoleExporter();
+                }
+                else
+                {
+                    builder.AddAzureMonitorMetricExporter();
+                }
             })
             .WithLogging(builder => { },
                 options =>
                 {
-                    options.AddAzureMonitorLogExporter();
+                    if (!host.HostingEnvironment.IsDevelopment())
+                    {
+                        options.AddAzureMonitorLogExporter();
+                    }
                 });
 
         services.AddTransient<ApplicationCredentialMonitor>();
